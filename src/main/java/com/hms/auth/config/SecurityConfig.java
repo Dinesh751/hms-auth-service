@@ -1,13 +1,15 @@
 package com.hms.auth.config;
 
+import com.hms.auth.service.JwtService;
+import com.hms.auth.service.UserService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -16,11 +18,15 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true) // ✅ Enable @PreAuthorize annotations
 public class SecurityConfig {
 
-    @Bean 
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    private final JwtService jwtService;
+    private final UserService userService;
+
+    public SecurityConfig(JwtService jwtService, UserService userService) {
+        this.jwtService = jwtService;
+        this.userService = userService;
     }
 
     @Bean
@@ -51,11 +57,21 @@ public class SecurityConfig {
                 
                 // Allow actuator endpoints (if you have them)
                 .requestMatchers("/actuator/**").permitAll()
+
+                // 🛡️ Role-based protected endpoints
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/doctor/**").hasRole("DOCTOR")
+                .requestMatchers("/api/patient/**").hasRole("PATIENT")
+                
+                // 🔒 Common authenticated endpoints
+                .requestMatchers("/api/profile/**").authenticated()
                 
                 // All other requests need authentication
                 .anyRequest().authenticated()
-            );
-            
+            )
+            // ✅ Add JWT filter BEFORE UsernamePasswordAuthenticationFilter
+            .addFilterBefore(new JwtAuthenticationFilter(jwtService, userService), UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
     

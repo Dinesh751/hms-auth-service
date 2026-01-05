@@ -31,9 +31,9 @@ import com.hms.auth.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-@WebMvcTest(HealthController.class)
+@WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
-class HealthControllerTest {
+class AuthControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
