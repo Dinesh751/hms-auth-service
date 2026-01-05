@@ -1,3 +1,371 @@
+# ========================================
+# DEFAULT CONFIGURATION (applies to all profiles)
+# ========================================
 spring:
   application:
     name: HMS Auth Service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:myVerySecureJWTSecretKeyForHMSAuthServiceThatIsAtLeast256BitsLongForSecurityPurposes2024}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:900}      # 15 minutes
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800}  # 7 days
+
+# Cookie Configuration (Base)
+cookie:
+  refresh-token:
+    name: "refresh_token"
+    path: "/api/auth/v1"
+    http-only: true
+    same-site: "Strict"
+
+# Management & Health Check
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+---
+# ========================================
+# DEVELOPMENT PROFILE
+# ========================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  # Development Database
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hms_auth_db
+    username: hms_user
+    password: hms_123
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 5
+
+  # JPA for Development
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Flyway for Development
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    clean-disabled: false  # Allow clean in development
+
+# Server Configuration - Development
+server:
+  port: 8080
+  servlet:
+    session:
+      cookie:
+        secure: false  # HTTP allowed in development
+
+# Cookie Configuration - Development
+cookie:
+  refresh-token:
+    secure: false      # HTTP cookies allowed
+    domain: ""         # Same domain only (localhost)
+
+# Logging - Development
+logging:
+  level:
+    root: INFO
+    org.springframework: DEBUG
+    com.hms.auth: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# Debug Configuration
+debug: true
+
+---
+# ========================================
+# TEST PROFILE
+# ========================================
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  # In-Memory Database for Testing
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+
+  # JPA for Testing
+  jpa:
+    hibernate:
+      ddl-auto: create-drop  # Recreate schema for each test
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # Disable Flyway for Tests
+  flyway:
+    enabled: false
+
+  # H2 Console (for debugging tests)
+  h2:
+    console:
+      enabled: true
+
+# Server Configuration - Test
+server:
+  port: 0  # Random available port for tests
+
+# JWT Configuration - Test (shorter expiration)
+jwt:
+  secret: "testSecretKeyForTestingOnlyMustBe256BitsLong12345678901234567890123456789012345678901234567890"
+  access-token-expiration: 60    # 1 minute for testing
+  refresh-token-expiration: 300  # 5 minutes for testing
+
+# Cookie Configuration - Test
+cookie:
+  refresh-token:
+    name: "test_refresh_token"
+    secure: false
+    domain: ""
+
+# Logging - Test (minimal)
+logging:
+  level:
+    root: WARN
+    com.hms.auth: DEBUG
+    org.springframework.test: INFO
+
+---
+# ========================================
+# STAGING PROFILE
+# ========================================
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+  # Staging Database
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:staging-db.yourhospital.com}:${DB_PORT:5432}/${DB_NAME:hms_auth_db}
+    username: ${DB_USERNAME:hms_staging_user}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  # JPA for Staging
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Flyway for Staging
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    clean-disabled: true
+
+# Server Configuration - Staging
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      cookie:
+        secure: true  # HTTPS required in staging
+
+# JWT Configuration - Staging
+jwt:
+  secret: ${JWT_SECRET}  # Must be provided as environment variable
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:900}
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:432000}  # 5 days in staging
+
+# Cookie Configuration - Staging
+cookie:
+  refresh-token:
+    secure: true                        # HTTPS only
+    domain: "staging.yourhospital.com"  # Staging domain
+
+# Logging - Staging
+logging:
+  level:
+    root: INFO
+    com.hms.auth: INFO
+    org.springframework: WARN
+    org.hibernate.SQL: WARN
+  file:
+    name: /var/log/hms-auth/staging.log
+
+---
+# ========================================
+# PRODUCTION PROFILE
+# ========================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  # Production Database
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:prod-db.yourhospital.com}:${DB_PORT:5432}/${DB_NAME:hms_auth_db}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 600000
+
+  # JPA for Production
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Never auto-create in production
+    show-sql: false       # Never show SQL in production
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Flyway for Production
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false  # Should already be baseline
+    validate-on-migrate: true
+    clean-disabled: true        # Never allow clean in production
+
+# Server Configuration - Production
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      cookie:
+        secure: true   # HTTPS required
+        same-site: strict
+      timeout: 30m
+  compression:
+    enabled: true
+  http2:
+    enabled: true
+
+# JWT Configuration - Production
+jwt:
+  secret: ${JWT_SECRET}  # MUST be provided as environment variable
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:900}     # 15 minutes
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:259200}  # 3 days (shorter in prod)
+
+# Cookie Configuration - Production
+cookie:
+  refresh-token:
+    secure: true                      # HTTPS only
+    domain: ${COOKIE_DOMAIN:yourhospital.com}  # Production domain
+    same-site: "Strict"              # Maximum security
+
+# Logging - Production
+logging:
+  level:
+    root: WARN
+    com.hms.auth: INFO
+    org.springframework: ERROR
+    org.hibernate: ERROR
+  file:
+    name: /var/log/hms-auth/application.log
+    max-size: 100MB
+    max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{traceId}] %logger{50} - %msg%n"
+
+# Management - Production (restricted)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never  # Hide details in production
+
+---
+# ========================================
+# DOCKER PROFILE
+# ========================================
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  # Docker Database (using service names)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:hms_auth_db}
+    username: ${DB_USERNAME:hms_user}
+    password: ${DB_PASSWORD:hms_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 60000
+      maximum-pool-size: 10
+
+  # JPA for Docker
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: ${SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Flyway for Docker
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# Server Configuration - Docker
+server:
+  port: 8080
+
+# JWT Configuration - Docker
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:900}
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800}
+
+# Cookie Configuration - Docker
+cookie:
+  refresh-token:
+    secure: ${COOKIE_SECURE:false}  # Configurable for different environments
+    domain: ${COOKIE_DOMAIN:}      # Configurable domain
+
+# Logging - Docker
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    com.hms.auth: ${APP_LOG_LEVEL:INFO}
