@@ -194,7 +194,7 @@ class UserServiceTest {
         when(userRepository.count()).thenReturn(5L);
 
         // Act
-        long count = userService.getUserCount();
+        long count = userService.count();
 
         // Assert
         assertEquals(5L, count);

@@ -182,22 +182,52 @@ public class UserService {
      * Get total user count
      */
     @Transactional(readOnly = true)
-    public long getUserCount() {
+    public long count() {
         return userRepository.count();
     }
     
     /**
-     * Get all users
+     * Find user by email
      */
-    @Transactional(readOnly = true)
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
-    }
-
     @Transactional(readOnly = true)
     public Optional<User> findByEmail(String email) {
         log.info("Finding user by email: {}", email);
         return userRepository.findByEmail(email.toLowerCase());
     }
     
+    /**
+     * Count users by role
+     */
+    @Transactional(readOnly = true)
+    public long countByRole(String roleName) {
+        try {
+            UserRole role = UserRole.valueOf(roleName.toUpperCase());
+            return userRepository.countByRole(role);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid role name: {}", roleName);
+            return 0;
+        }
+    }
+    
+    /**
+     * Count active (enabled) users
+     */
+    @Transactional(readOnly = true)
+    public long countActiveUsers() {
+        return userRepository.countByEnabledTrue();
+    }
+    
+    /**
+     * Find users by role
+     */
+    @Transactional(readOnly = true)
+    public List<User> findByRole(String roleName) {
+        try {
+            UserRole role = UserRole.valueOf(roleName.toUpperCase());
+            return userRepository.findByRole(role);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid role name: {}", roleName);
+            return List.of();
+        }
+    }
 }

@@ -1,26 +1,17 @@
 package com.hms.auth.controller;
 
-import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
 import java.time.LocalDateTime;
 
-// ✅ Jackson for JSON processing (already included)
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-
-
 // ✅ Spring Boot utilities
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.OAuth2ResourceServerProperties.Jwt;
-import org.springframework.boot.info.BuildProperties;
-import org.springframework.core.env.Environment;
+
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,7 +34,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth/v1")
-public class HealthController {
+public class AuthController {
     
    private UserService userService;
 
@@ -52,7 +43,7 @@ public class HealthController {
    private CookieService cookieService;
 
    @Autowired
-   public HealthController(UserService userService, JwtService jwtService, CookieService cookieService) {
+   public AuthController(UserService userService, JwtService jwtService, CookieService cookieService) {
        this.userService = userService;
        this.jwtService = jwtService;
        this.cookieService = cookieService;
@@ -179,7 +170,7 @@ public class HealthController {
         }
 
         String email = jwtService.extractEmail(refreshToken);
-        Optional<User> userOpt = userService.findByEmail(email);
+        Optional<User> userOpt = userService.getUserByEmail(email);
 
         if (userOpt.isEmpty()) {
             // Clear refresh token cookie if user not found
