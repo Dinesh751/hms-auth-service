@@ -1,6 +1,5 @@
 package com.hms.auth.dto;
 
-import com.hms.auth.entity.UserRole;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -23,5 +22,5 @@ public class RegisterRequest {
     private String password;
 
     @NotNull(message = "Role is required")
-    private UserRole role;
+    private String role;
 }
