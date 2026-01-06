@@ -8,6 +8,9 @@ import java.time.LocalDateTime;
 // ✅ Spring Boot utilities
 import org.springframework.beans.factory.annotation.Autowired;
 
+// ✅ Metrics
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Timer;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,10 +40,24 @@ import jakarta.servlet.http.HttpServletRequest;
 public class AuthController {
     
    private UserService userService;
-
    private JwtService jwtService;
-
    private CookieService cookieService;
+   
+   // Metrics beans
+   @Autowired
+   private Counter loginSuccessCounter;
+   
+   @Autowired
+   private Counter loginFailureCounter;
+   
+   @Autowired
+   private Counter userRegistrationCounter;
+   
+   @Autowired
+   private Counter jwtTokenCounter;
+   
+   @Autowired
+   private Timer authenticationTimer;
 
    @Autowired
    public AuthController(UserService userService, JwtService jwtService, CookieService cookieService) {
@@ -78,6 +95,10 @@ public class AuthController {
 
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
+        
+        // Track successful registration and token generation
+        userRegistrationCounter.increment();
+        jwtTokenCounter.increment(2); // access + refresh token
 
         cookieService.createRefreshTokenCookie(response,refreshToken);
 
@@ -110,41 +131,51 @@ public class AuthController {
     @Valid @RequestBody LoginRequest requestBody,
     HttpServletResponse response
    ) {
+       Timer.Sample sample = Timer.start();
        try {
            Optional<User> userOpt = userService.authenticateUser(requestBody.getEmail(), requestBody.getPassword());
 
-            // ✅ Check if authentication was successful
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.<TokenResponse>error("Authentication failed", "Invalid email or password"));
-        }
-         
-        User user = userOpt.get();
+           // ✅ Check if authentication was successful
+           if (userOpt.isEmpty()) {
+               loginFailureCounter.increment();
+               return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                   .body(ApiResponse.<TokenResponse>error("Authentication failed", "Invalid email or password"));
+           }
+        
+           User user = userOpt.get();
 
-        String accessToken = jwtService.generateAccessToken(user);
-        String refreshToken = jwtService.generateRefreshToken(user);
+           String accessToken = jwtService.generateAccessToken(user);
+           String refreshToken = jwtService.generateRefreshToken(user);
+           
+           // Track successful operations
+           loginSuccessCounter.increment();
+           jwtTokenCounter.increment(2); // access + refresh token
 
-        cookieService.createRefreshTokenCookie(response, refreshToken);
+           cookieService.createRefreshTokenCookie(response, refreshToken);
 
-        TokenResponse.UserInfo userInfo = new TokenResponse.UserInfo(
-            user.getId().toString(),
-            user.getEmail(),
-            user.getRole().name(),
-            user.getEnabled()
-        );
+           TokenResponse.UserInfo userInfo = new TokenResponse.UserInfo(
+               user.getId().toString(),
+               user.getEmail(),
+               user.getRole().name(),
+               user.getEnabled()
+           );
 
-        TokenResponse tokenResponse = new TokenResponse();
-        tokenResponse.setAccessToken(accessToken);
-        tokenResponse.setUser(userInfo);
-        tokenResponse.setExpiresIn(jwtService.getTokenExpiryTime(accessToken));
+           TokenResponse tokenResponse = new TokenResponse();
+           tokenResponse.setAccessToken(accessToken);
+           tokenResponse.setUser(userInfo);
+           tokenResponse.setExpiresIn(jwtService.getTokenExpiryTime(accessToken));
 
-        return ResponseEntity.ok(ApiResponse.success("Login successful", tokenResponse));
-    } catch (IllegalArgumentException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse.error("Login failed", e.getMessage()));
-    } catch (Exception e) {
+           return ResponseEntity.ok(ApiResponse.success("Login successful", tokenResponse));
+       } catch (IllegalArgumentException e) {
+           loginFailureCounter.increment();
+           return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+               .body(ApiResponse.error("Login failed", e.getMessage()));
+       } catch (Exception e) {
+           loginFailureCounter.increment();
            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                .body(ApiResponse.error("Login failed", e.getMessage()));
+       } finally {
+           sample.stop(authenticationTimer);
        }
    }
 
